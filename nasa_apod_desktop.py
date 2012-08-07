@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-'''
+"""
 Copyright (c) 2012 David Drake
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,8 +19,8 @@ nasa_apod_desktop.py
 https://github.com/randomdrake/nasa-apod-desktop
 
 Written/Modified by David Drake
-http://randomdrake.com 
-http://twitter.com/randomdrake 
+http://randomdrake.com
+http://twitter.com/randomdrake
 
 Based on apodbackground: http://sourceforge.net/projects/apodbackground/
 Which, is based on: http://0chris.com/nasa-image-day-script-python.html
@@ -36,7 +36,7 @@ Tested on Ubuntu 12.04
 
 
 DESCRIPTION
-1) Grabs the latest image of the day from NASA (http://apod.nasa.gov/apod/). 
+1) Grabs the latest image of the day from NASA (http://apod.nasa.gov/apod/).
 2) Resizes the image to the given resolution.
 3) Sets the image as your desktop.
 4) Adds the image to a list of images that will be cycled through.
@@ -47,11 +47,11 @@ Ensure you have Python installed (default for Ubuntu) and the python-imaging pac
 sudo apt-get install python-imaging
 
 Set your resolution variables and your download path (make sure it's writeable):
-'''
-DOWNLOAD_PATH = '/home/randomdrake/backgrounds/'
-RESOLUTION_X = 1680
-RESOLUTION_Y = 1050
-''' 
+"""
+DOWNLOAD_PATH = '/Users/sriharshachintalapani/Pictures/backgrounds/'
+RESOLUTION_X = 2880
+RESOLUTION_Y = 1800
+"""
 
 RUN AT STARTUP
 To have this run whenever you startup your computer, perform the following steps:
@@ -63,21 +63,25 @@ Name: NASA APOD Desktop
 Command: python /path/to/nasa_apod_desktop.py
 Comment: Downloads the latest NASA APOD and sets it as the background.
 5) Click on the "Add" button
-'''
+"""
 import commands
 import urllib
 import urllib2
 import re
 import os
-from PIL import Image
-from sys import stdout
+import subprocess
 
+from sys import stdout
+import sys
+sys.path.append("/usr/local/lib/python2.7/site-packages")
+from PIL import Image
 # Configurable settings:
 NASA_APOD_SITE = 'http://apod.nasa.gov/apod/'
+#NASA_APOD_SITE = 'http://apod.nasa.gov/apod/ap120805.html'
 SHOW_DEBUG = False
 
 def download_site(url):
-    ''' Download HTML of the site'''
+    """ Download HTML of the site"""
     if SHOW_DEBUG:
         print "Downloading contents of the site to find the image name"
     opener = urllib2.build_opener()
@@ -87,10 +91,13 @@ def download_site(url):
     return reply
 
 def get_image(text):
-    ''' Finds the image URL and saves it '''
+    """ Finds the image URL and saves it """
     if SHOW_DEBUG:
         print "Grabbing the image URL"
     reg = re.search('<a href="(image.*?)"', text, re.DOTALL)
+    if reg is None:
+       print "No Image from NASA today"
+       sys.exit()
     if 'http' in reg.group(1):
         # Actual url
         file_url = reg.group(1)
@@ -99,7 +106,7 @@ def get_image(text):
         file_url = NASA_APOD_SITE + reg.group(1)
 
     filename = os.path.basename(file_url)
-    save_to = DOWNLOAD_PATH + os.path.splitext(filename)[0] + '.png'
+    save_to = DOWNLOAD_PATH + os.path.splitext(filename)[0] + '.jpg'
     if not os.path.isfile(save_to):
         if SHOW_DEBUG:
             print "Opening remote URL"
@@ -110,10 +117,10 @@ def get_image(text):
             print "Retrieving image"
             urllib.urlretrieve(file_url, save_to, print_download_status)
 
-            # Adding additional padding to ensure entire line 
+            # Adding additional padding to ensure entire line
             if SHOW_DEBUG:
                 print "\rDone downloading", human_readable_size(file_size), "       "
-        else: 
+        else:
             urllib.urlretrieve(file_url, save_to)
     elif SHOW_DEBUG:
         print "File exists, moving on"
@@ -121,7 +128,7 @@ def get_image(text):
     return save_to
 
 def resize_image(filename):
-    ''' Resizes the image to the provided dimensions '''
+    """ Resizes the image to the provided dimensions """
     if SHOW_DEBUG:
         print "Opening local image"
 
@@ -136,7 +143,7 @@ def resize_image(filename):
     image.save(fhandle, 'PNG')
 
 def set_gnome_wallpaper(file_path):
-    ''' Sets the new image as the wallpaper '''
+    """ Sets the new image as the wallpaper """
     if SHOW_DEBUG:
         print "Setting the wallpaper"
     command = "gsettings set org.gnome.desktop.background picture-uri file://" + file_path
@@ -157,25 +164,36 @@ def human_readable_size(number_bytes):
             return "%3.2f%s" % (number_bytes, x)
         number_bytes /= 1024.0
 
+def set_osx_wallpaper(file_path):
+    if SHOW_DEBUG:
+         print "Setting the wallpaper"
+
+    SCRIPT = """/usr/bin/osascript<<END
+            tell application "Finder"
+            set desktop picture to POSIX file "%s"
+            end tell"""
+
+    subprocess.Popen(SCRIPT%filename,shell=True)
+
 if __name__ == '__main__':
-    ''' Our program '''
-    if SHOW_DEBUG: 
+    """ Our program """
+    if SHOW_DEBUG:
         print "Starting"
     # Create the download path if it doesn't exist
     if not os.path.exists(os.path.expanduser(DOWNLOAD_PATH)):
         os.makedirs(os.path.expanduser(DOWNLOAD_PATH))
 
-    # Grab the HTML contents of the file 
+    # Grab the HTML contents of the file
     site_contents = download_site(NASA_APOD_SITE)
 
     # Download the image
     filename = get_image(site_contents)
 
-    # Resize the image
-    resize_image(filename)
-
     # Set the wallpaper
-    status = set_gnome_wallpaper(filename)
+    if os.uname()[0] == 'Darwin':
+        status = set_osx_wallpaper(filename)
+    else:
+        resize_image(filename)
+        status = set_gnome_wallpaper(filename)
     if SHOW_DEBUG:
         print "Finished!"
-
